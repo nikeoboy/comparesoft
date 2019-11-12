@@ -1,0 +1,143 @@
+import win.ui;
+import win.ui.atom;
+import fsys.dlg;
+import console;
+import io;
+import crypt;
+import zlib.zip;
+/*DSG{{*/
+mainForm = win.form(text="Compare V1.0";right=566;bottom=344)
+mainForm.add(
+button1={cls="button";text="选择...";left=442;top=83;right=537;bottom=113;ah=1;aw=1;font=LOGFONT(h=-14);z=1};
+button2={cls="button";text="选择...";left=443;top=134;right=538;bottom=164;ah=1;aw=1;font=LOGFONT(h=-14);z=4};
+button3={cls="button";text="选择...";left=445;top=183;right=540;bottom=213;ah=1;aw=1;font=LOGFONT(h=-14);z=7};
+buttonStart={cls="button";text="生成差异";left=215;top=239;right=331;bottom=279;ah=1;aw=1;font=LOGFONT(h=-16);z=10};
+checkbox={cls="checkbox";text="生成.zip";left=101;top=221;right=168;bottom=239;z=15};
+edit1={cls="edit";left=101;top=87;right=427;bottom=115;ah=1;aw=1;edge=1;font=LOGFONT(h=-14);z=3};
+edit2={cls="edit";left=101;top=138;right=427;bottom=166;ah=1;aw=1;edge=1;font=LOGFONT(h=-14);z=6};
+edit3={cls="edit";left=101;top=186;right=427;bottom=214;ah=1;aw=1;edge=1;font=LOGFONT(h=-14);z=9};
+static={cls="static";text="基础目录：";left=26;top=91;right=96;bottom=114;ah=1;aw=1;font=LOGFONT(h=-14);transparent=1;z=2};
+static2={cls="static";text="注：差异目录为对比差异文件导出目录";left=133;top=291;right=419;bottom=308;ah=1;align="center";aw=1;center=1;color=255;notify=1;transparent=1;z=11};
+static3={cls="static";text="《狂刃H5》版本差异对比";left=72;top=28;right=463;bottom=59;ah=1;align="center";aw=1;font=LOGFONT(h=-19;weight=700);notify=1;transparent=1;z=12};
+static4={cls="static";text="Author：by nikeo";left=279;top=322;right=380;bottom=339;ah=1;aw=1;center=1;notify=1;transparent=1;z=13};
+static5={cls="static";text="对比目录：";left=26;top=142;right=96;bottom=160;ah=1;aw=1;font=LOGFONT(h=-14);transparent=1;z=5};
+static6={cls="static";text="差异目录：";left=26;top=190;right=96;bottom=211;ah=1;aw=1;font=LOGFONT(h=-14);notify=1;transparent=1;z=8};
+static7={cls="static";text="Version：v1.0";left=184;top=322;right=264;bottom=339;ah=1;aw=1;center=1;notify=1;transparent=1;z=14}
+)
+/*}}*/
+
+mainForm.button1.oncommand = function(id,event){
+	mainForm.edit1.text = fsys.dlg.opendir();
+}
+
+mainForm.button2.oncommand = function(id,event){
+	mainForm.edit2.text = fsys.dlg.opendir();
+}
+
+mainForm.button3.oncommand = function(id,event){
+	mainForm.edit3.text = fsys.dlg.opendir();
+}
+
+//对比差异
+mainForm.buttonStart.oncommand = function(id,event){
+	var dir1 = mainForm.edit1.text;
+	var dir2 = mainForm.edit2.text;
+	var dir3 = mainForm.edit3.text;
+	if(dir1 == "" || dir2 == "" || dir3 == "")
+	{
+		win.msgbox("目录不许为空！","提示")
+		return
+	}
+	io.open()
+	io.print("开始对比差异：")
+	findDiff(dir1, dir2, dir3);	
+	io.print("对比差异完成")
+	//打包成zip
+	if(mainForm.checkbox.checked)
+	{
+		io.print("开始打包：")
+		var zip = zlib.zip(dir3+"/time.zip"  ); 
+		zip.compress( dir3,
+    		function(len,path){
+        		..io.print( len,path )
+    		}
+		)
+		zip.close();
+		io.print("打包完成")
+	}
+	
+	console.pause(true, "请按任意键继续 ... ");		
+}
+
+/**
+dir1 原目录
+dir2 新目录
+dir3 对比生成差异目录
+win.msgbox("发现目录：" + dir)
+**/
+findDiff = function(dir1, dir2, dir3){	
+	fsys.enum( dir2, "*.*",
+		function(dir,filename,fullpath,findData){
+			//过滤.svn目录			
+			if(type(string.match(fullpath, ".svn")) == 'null')
+			{
+				//对比目录
+				path1 = string.replace(tostring(fullpath), tostring("@"+dir2), tostring(dir1))				
+				path3 = string.replace(tostring(fullpath), tostring("@"+dir2), tostring(dir3))				
+				if(filename){
+					//文件
+					if(!io.exist(path1))
+					{
+						io.print("【+新增文件+】："+path3)
+						fsys.copy(fullpath, path3)					
+					}
+					else {
+						//如果文件已存在，则对比文件的md5码
+						p1Md5 = crypt.md5(string.loadBuffer(path1))
+						p2Md5 = crypt.md5(string.loadBuffer(fullpath))
+						if(!(p1Md5 == p2Md5))
+						{
+							io.print("【*变化文件*】："+path3)
+							fsys.copy(fullpath, path3)
+						}
+					}
+				}
+				else{
+					//新建一个目录
+					//如果目录未找到则新增目录
+					if(!io.exist(path1))
+					{						
+						fsys.createDir(path3)
+						io.print("【+新增目录+】：" + path3)
+					}
+				}
+			}
+		} 
+		,/*如果此参数为false则忽略子目录*/
+	);
+}
+
+/**
+打印窗口关闭
+**/
+startToClose = function(){
+	time2 = time.now();
+	mainForm.clearInterval(timerId)
+	timerId = mainForm.setInterval(
+		1000,function(){
+			// 定时执行参数@2指定的回调函数,参数@1指定间隔毫秒数
+			timelen = 11-(tonumber(time.now())-tonumber(time2))
+			if(timelen < 1) io.close()
+			io.print(timelen+"秒后窗口关闭...")			
+		}
+	)
+}
+
+/**
+功能描述：
+1.新增目录或者文件
+2.对比已存在文件的MD5值
+**/
+var timerId = 0;
+mainForm.show();
+return win.loopMessage();
